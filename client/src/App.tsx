@@ -103,8 +103,10 @@ function App() {
 
   const createRoom = async () => {
     const id = await webrtc.createRoom();
-    setRoomId(id);
-    setIsHost(true);
+    if (id) {
+      setRoomId(id);
+      setIsHost(true);
+    }
   };
 
   const joinRoom = async () => {
@@ -183,14 +185,14 @@ function App() {
             {Object.values(users).map((user) => (
               <UserItem
                 key={user.id}
-                className={user.id === webrtc.socket.id ? "me" : ""}
+                className={user.id === webrtc.getId() ? "me" : ""}
                 style={{
                   backgroundColor: user.personalColor,
                   color: "#fff",
                 }}
               >
                 {user.nickname || user.id}
-                {user.id === webrtc.socket.id && " (나)"}
+                {user.id === webrtc.getId() && " (나)"}
               </UserItem>
             ))}
           </UsersList>

@@ -20,11 +20,16 @@ interface UserInfo {
 const rooms = new Map<string, Set<string>>();
 const userInfos = new Map<string, UserInfo>();
 
+const users: { [key: string]: { socketId: string; roomId?: string } } = {};
+
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
+  users[socket.id] = { socketId: socket.id };
 
   socket.on("join", (roomId) => {
+    console.log(`User ${socket.id} joining room ${roomId}`);
     socket.join(roomId);
+    users[socket.id].roomId = roomId;
 
     if (!rooms.has(roomId)) {
       rooms.set(roomId, new Set());
@@ -67,15 +72,21 @@ io.on("connection", (socket) => {
   });
 
   socket.on("offer", ({ offer, roomId }) => {
-    socket.to(roomId).emit("offer", offer);
+    console.log(`Received offer from ${socket.id} for room ${roomId}`);
+    socket.to(roomId).emit("offer", { offer, from: socket.id });
   });
 
   socket.on("answer", ({ answer, roomId }) => {
-    socket.to(roomId).emit("answer", answer);
+    console.log(`Received answer from ${socket.id} for room ${roomId}`);
+    socket.to(roomId).emit("answer", { answer, from: socket.id });
   });
 
   socket.on("ice-candidate", ({ candidate, roomId }) => {
-    socket.to(roomId).emit("ice-candidate", candidate);
+    console.log(`Received ICE candidate from ${socket.id} for room ${roomId}`);
+    socket.to(roomId).emit("ice-candidate", {
+      candidate,
+      from: socket.id,
+    });
   });
 
   socket.on("disconnecting", () => {
@@ -86,7 +97,24 @@ io.on("connection", (socket) => {
       }
     }
   });
+
+  socket.on("disconnect", () => {
+    const roomId = users[socket.id]?.roomId;
+    if (roomId) {
+      io.to(roomId).emit("users", getUsers(roomId));
+    }
+    delete users[socket.id];
+  });
 });
+
+function getUsers(roomId: string) {
+  return Object.entries(users)
+    .filter(([_, user]) => user.roomId === roomId)
+    .reduce((acc, [socketId, user]) => {
+      acc[socketId] = user;
+      return acc;
+    }, {} as { [key: string]: any });
+}
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
